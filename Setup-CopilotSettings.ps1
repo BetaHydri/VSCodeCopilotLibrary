@@ -93,13 +93,17 @@ if ($oneDriveCandidates.Count -gt 1) {
     $selectedKey = $choices[[int]$selection - 1]
     $oneDriveRoot = $oneDriveCandidates[$selectedKey]
     Write-Host "Using OneDrive ($selectedKey): $oneDriveRoot"
-} elseif ($oneDriveCandidates.Count -eq 1) {
+}
+elseif ($oneDriveCandidates.Count -eq 1) {
     $oneDriveRoot = $oneDriveCandidates.Values | Select-Object -First 1
-} elseif ($env:OneDrive -and (Test-Path $env:OneDrive)) {
+}
+elseif ($env:OneDrive -and (Test-Path $env:OneDrive)) {
     $oneDriveRoot = $env:OneDrive
-} elseif (Test-Path "$env:USERPROFILE\OneDrive") {
+}
+elseif (Test-Path "$env:USERPROFILE\OneDrive") {
     $oneDriveRoot = "$env:USERPROFILE\OneDrive"
-} else {
+}
+else {
     $oneDriveRoot = $null
 }
 
@@ -110,7 +114,8 @@ if ($oneDriveCandidates.Count -gt 1) {
 if ($oneDriveRoot) {
     $pathPrefix = "~/OneDrive/$repoName"
     Write-Host "OneDrive detected at: $oneDriveRoot - registering ~/OneDrive/$repoName paths."
-} else {
+}
+else {
     $pathPrefix = "~/$repoName"
     Write-Host "OneDrive not found - registering ~/$repoName paths."
 }
@@ -156,7 +161,8 @@ $settings | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
 # to ~/<repoName>.
 if ($oneDriveRoot) {
     $targetBase = Join-Path $oneDriveRoot $repoName
-} else {
+}
+else {
     $targetBase = "$env:USERPROFILE\$repoName"
 }
 $subDirs = @('Agents', 'Instructions', 'Skills', 'Prompts')
@@ -174,11 +180,12 @@ foreach ($sub in $subDirs) {
 # --- Copy files from repo to target ---
 foreach ($sub in $subDirs) {
     $source = Join-Path $repoRoot $sub
-    $dest   = Join-Path $targetBase $sub
+    $dest = Join-Path $targetBase $sub
     if (Test-Path $source) {
         Copy-Item -Path "$source\*" -Destination $dest -Recurse -Force
         Write-Host "Copied:  $source -> $dest"
-    } else {
+    }
+    else {
         Write-Host "Skipped: $source (not found in repo)"
     }
 }
