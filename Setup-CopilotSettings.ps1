@@ -104,42 +104,31 @@ if ($oneDriveCandidates.Count -gt 1) {
 }
 
 # --- File location settings (merged, not replaced) ---
-# ~/<repoName> is always registered so settings remain identical regardless of
-# whether OneDrive is installed on the current machine.
+# Prefer ~/OneDrive/<repoName> so agents, skills, instructions, and prompts
+# sync across laptops via OneDrive.  Fall back to ~/<repoName> when OneDrive
+# is not available.
+if ($oneDriveRoot) {
+    $pathPrefix = "~/OneDrive/$repoName"
+    Write-Host "OneDrive detected at: $oneDriveRoot - registering ~/OneDrive/$repoName paths."
+} else {
+    $pathPrefix = "~/$repoName"
+    Write-Host "OneDrive not found - registering ~/$repoName paths."
+}
+
 Merge-LocationSetting $settings 'chat.agentFilesLocations' @{
-    "~/$repoName/Agents" = $true
+    "$pathPrefix/Agents" = $true
 }
 
 Merge-LocationSetting $settings 'chat.instructionsFilesLocations' @{
-    "~/$repoName/Instructions" = $true
+    "$pathPrefix/Instructions" = $true
 }
 
 Merge-LocationSetting $settings 'chat.agentSkillsLocations' @{
-    "~/$repoName/Skills" = $true
+    "$pathPrefix/Skills" = $true
 }
 
 Merge-LocationSetting $settings 'chat.promptFilesLocations' @{
-    "~/$repoName/Prompts" = $true
-}
-
-# When OneDrive is available, also register the synced paths.
-if ($oneDriveRoot) {
-    Write-Host "OneDrive detected at: $oneDriveRoot"
-
-    Merge-LocationSetting $settings 'chat.agentFilesLocations' @{
-        "~/OneDrive/$repoName/Agents" = $true
-    }
-    Merge-LocationSetting $settings 'chat.instructionsFilesLocations' @{
-        "~/OneDrive/$repoName/Instructions" = $true
-    }
-    Merge-LocationSetting $settings 'chat.agentSkillsLocations' @{
-        "~/OneDrive/$repoName/Skills" = $true
-    }
-    Merge-LocationSetting $settings 'chat.promptFilesLocations' @{
-        "~/OneDrive/$repoName/Prompts" = $true
-    }
-} else {
-    Write-Host "OneDrive not found - only ~/$repoName paths registered."
+    "$pathPrefix/Prompts" = $true
 }
 
 # --- Feature flags ---
@@ -162,12 +151,18 @@ $settings | Add-Member -NotePropertyName 'github.copilot.chat.agent.maxRequests'
 # Write back
 $settings | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
 
-# --- Always clear and recreate ~/<repoName> subdirectories ---
-$localBase = "$env:USERPROFILE\$repoName"
-$subDirs   = @('Agents', 'Instructions', 'Skills', 'Prompts')
+# --- Determine target base directory ---
+# Use OneDrive when available so files sync across laptops; otherwise fall back
+# to ~/<repoName>.
+if ($oneDriveRoot) {
+    $targetBase = Join-Path $oneDriveRoot $repoName
+} else {
+    $targetBase = "$env:USERPROFILE\$repoName"
+}
+$subDirs = @('Agents', 'Instructions', 'Skills', 'Prompts')
 
 foreach ($sub in $subDirs) {
-    $dir = Join-Path $localBase $sub
+    $dir = Join-Path $targetBase $sub
     if (Test-Path $dir) {
         Remove-Item -Path $dir -Recurse -Force
         Write-Host "Cleared: $dir"
@@ -176,29 +171,15 @@ foreach ($sub in $subDirs) {
     Write-Host "Created: $dir"
 }
 
-# --- Copy files from repo to ~/<repoName> ---
+# --- Copy files from repo to target ---
 foreach ($sub in $subDirs) {
     $source = Join-Path $repoRoot $sub
-    $dest   = Join-Path $localBase $sub
+    $dest   = Join-Path $targetBase $sub
     if (Test-Path $source) {
         Copy-Item -Path "$source\*" -Destination $dest -Recurse -Force
         Write-Host "Copied:  $source -> $dest"
     } else {
         Write-Host "Skipped: $source (not found in repo)"
-    }
-}
-
-# --- Create OneDrive/<repoName> directories if OneDrive is available ---
-if ($oneDriveRoot) {
-    $oneDriveBase = Join-Path $oneDriveRoot $repoName
-    foreach ($sub in $subDirs) {
-        $dir = Join-Path $oneDriveBase $sub
-        if (-not (Test-Path $dir)) {
-            New-Item -ItemType Directory -Path $dir -Force | Out-Null
-            Write-Host "Created: $dir"
-        } else {
-            Write-Host "Exists:  $dir"
-        }
     }
 }
 
